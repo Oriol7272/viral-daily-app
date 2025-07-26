@@ -1,12 +1,12 @@
 const fs = require('fs');
 const axios = require('axios');
 
-// Keys from your MS_TOKEN _(2).txt file (integrated directly; in production, use env vars)
-const youtubeKey = process.env.YOUTUBE_API_KEY || 'AIzaSyDyuMNfrJXOMk4lCwJ7GV70zEP6iwrISuY';
-const tiktokMsToken = process.env.TIKTOK_MS_TOKEN || 'X_LeGXnwuxU3UoagaHwJO772TN7gDLYTt_Vn5rN54jDZsC1B7Sm_6XE8r1DDQfsCCH0l94tRJ1zCp_X7navLQQLcbhGqrzHZF9Ny8nKg0itVq9wB4NR9_NZyvfQluZPShhgKMhuhRETyJj-quBSC5uVU';
-const tiktokClientKey = process.env.TIKTOK_CLIENT_KEY || 'YsSYGHOy5hahvCuhsThDMuC09'; // Invalid token - fallback used
-const tiktokClientSecret = process.env.TIKTOK_CLIENT_SECRET || 'cj2pm8NnZMHEZl1YgvMIVcwYcCmhOZllfikjGUrWkJMLsglvBn'; // Invalid secret - fallback used
-const xBearerToken = process.env.X_BEARER_TOKEN || 'AAAAAAAAAAAAAAAAAAAAAHvz3AEAAAAA0KKiiRMU8nwQ8ggjG96GDhCZ8T8%3D6BrOF6a4YszLFgLKD1sLlSuhZdkIFemgCQxo0cTaXAXtjLHnJ';
+// Keys from your MS_TOKEN _(2).txt file (integrated directly; use env vars in production)
+const youtubeKey = 'AIzaSyDyuMNfrJXOMk4lCwJ7GV70zEP6iwrISuY';
+const tiktokMsToken = 'X_LeGXnwuxU3UoagaHwJO772TN7gDLYTt_Vn5rN54jDZsC1B7Sm_6XE8r1DDQfsCCH0l94tRJ1zCp_X7navLQQLcbhGqrzHZF9Ny8nKg0itVq9wB4NR9_NZyvfQluZPShhgKMhuhRETyJj-quBSC5uVU';
+const tiktokClientKey = 'YsSYGHOy5hahvCuhsThDMuC09'; // New TikTok client key
+const tiktokClientSecret = 'cj2pm8NnZMHEZl1YgvMIVcwYcCmhOZllfikjGUrWkJMLsglvBn'; // New TikTok client secret
+const xBearerToken = 'AAAAAAAAAAAAAAAAAAAAAHvz3AEAAAAA0KKiiRMU8nwQ8ggjG96GDhCZ8T8%3D6BrOF6a4YszLFgLKD1sLlSuhzZdkIFemgCQxo0cTaXAXtjLHnJ';
 
 console.log('Script started.');
 
@@ -53,14 +53,27 @@ async function fetchVirales() {
     }));
   }
 
-  // TikTok fetch with msToken (client key/secret invalid - using msToken as primary)
+  // TikTok fetch with new client key/secret (get access token via client_credentials, then query)
   try {
-    const ttResponse = await axios.get(`https://www.tiktok.com/api/search/general/full/?keyword=viral&msToken=${tiktokMsToken}&offset=0&count=10`, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-    tiktokVirales = (ttResponse.data.data || []).map(item => ({
-      title: item.desc || 'TikTok Viral',
-      likes: item.playCount || 0,
-      thumbnail: item.cover || 'https://placehold.co/150?text=TT',
-      link: `https://www.tiktok.com/video/${item.videoId || ''}`
+    // Get TikTok access token
+    const tokenResponse = await axios.post('https://open.tiktokapis.com/v2/oauth/token/', new URLSearchParams({
+      client_key: tiktokClientKey,
+      client_secret: tiktokClientSecret,
+      grant_type: 'client_credentials'
+    }), {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    });
+    const accessToken = tokenResponse.data.access_token;
+
+    // Fetch videos using access token
+    const ttResponse = await axios.post('https://open.tiktokapis.com/v2/research/video/query/?fields=id,create_time,description,username,video_description,height,width,duration,play_count,like_count,comment_count,share_count', { query_keywords: 'viral' }, {
+      headers: { 'Authorization': `Bearer ${accessToken}` }
+    });
+    tiktokVirales = ttResponse.data.data.map(item => ({
+      title: item.description || 'TikTok Viral',
+      likes: item.like_count || 0,
+      thumbnail: 'https://placehold.co/150?text=TT', // Replace with real thumbnail if available in response
+      link: `https://www.tiktok.com/video/${item.id || ''}`
     })).sort((a, b) => b.likes - a.likes).slice(0, 10);
     console.log('Fetched TikTok:', tiktokVirales.length);
     console.log('TikTok data:', JSON.stringify(tiktokVirales, null, 2));
@@ -74,7 +87,7 @@ async function fetchVirales() {
     }));
   }
 
-  // X fetch (user.fields=username for proper author names)
+  // X fetch (added user.fields=username to fix @undefined issue)
   try {
     const xResponse = await fetchWithRetry('https://api.twitter.com/2/tweets/search/recent?query=viral videos lang:en has:videos&max_results=10&tweet.fields=public_metrics,attachments&expansions=attachments.media_keys,author_id&media.fields=preview_image_url,url&user.fields=username', {
       headers: { 'Authorization': `Bearer ${xBearerToken}` }
@@ -105,17 +118,10 @@ async function fetchVirales() {
 
 async function generateHTML() {
   const data = await fetchVirales();
-  const html = `<!DOCTYPE html><html><head><title>Viral Daily</title><style>
-    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-family: Arial, sans-serif; }
-    th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-    th { background-color: #f2f2f2; font-weight: bold; }
-    img { max-width: 150px; height: auto; display: block; }
-    a { color: #0066cc; text-decoration: none; }
-    a:hover { text-decoration: underline; }
-  </style></head><body><h1>Top 10 Virales - ${new Date().toLocaleDateString()}</h1>
-  <h2>YouTube</h2><table><tr><th>Title</th><th>Views</th><th>Thumbnail</th><th>Link</th></tr>${data.youtube.map(v => `<tr><td>${v.title}</td><td>${v.views}</td><td><img src="${v.thumbnail}" alt="YouTube Thumbnail"></td><td><a href="${v.link}">Ver</a></td></tr>`).join('')}</table>
-  <h2>TikTok</h2><table><tr><th>Title</th><th>Likes</th><th>Thumbnail</th><th>Link</th></tr>${data.tiktok.map(v => `<tr><td>${v.title}</td><td>${v.likes}</td><td><img src="${v.thumbnail}" alt="TikTok Thumbnail"></td><td><a href="${v.link}">Ver</a></td></tr>`).join('')}</table>
-  <h2>X</h2><table><tr><th>Author</th><th>Likes</th><th>Thumbnail</th><th>Link</th></tr>${data.x.map(v => `<tr><td>${v.author}</td><td>${v.likes}</td><td><img src="${v.thumbnail}" alt="X Thumbnail"></td><td><a href="${v.link}">Ver</a></td></tr>`).join('')}</table>
+  const html = `<!DOCTYPE html><html><body><h1>Top 10 Virales - ${new Date().toLocaleDateString()}</h1>
+  <h2>YouTube</h2><table><tr><th>Title</th><th>Views</th><th>Thumbnail</th><th>Link</th></tr>${data.youtube.map(v => `<tr><td>${v.title}</td><td>${v.views}</td><td><img src="${v.thumbnail}"></td><td><a href="${v.link}">Ver</a></td></tr>`).join('')}</table>
+  <h2>TikTok</h2><table><tr><th>Title</th><th>Likes</th><th>Thumbnail</th><th>Link</th></tr>${data.tiktok.map(v => `<tr><td>${v.title}</td><td>${v.likes}</td><td><img src="${v.thumbnail}"></td><td><a href="${v.link}">Ver</a></td></tr>`).join('')}</table>
+  <h2>X</h2><table><tr><th>Author</th><th>Likes</th><th>Thumbnail</th><th>Link</th></tr>${data.x.map(v => `<tr><td>${v.author}</td><td>${v.likes}</td><td><img src="${v.thumbnail}"></td><td><a href="${v.link}">Ver</a></td></tr>`).join('')}</table>
   </body></html>`;
   fs.writeFileSync('index.html', html);
   console.log('Generated HTML with fresh virales.');
