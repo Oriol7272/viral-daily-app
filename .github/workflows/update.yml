@@ -1,6 +1,6 @@
 name: Update Diario
 on:
-  workflow_dispatch:  # Adds manual run button
+  workflow_dispatch:  # Enables manual run button
   schedule:
     - cron: '0 0 * * *'  # 00:00 UTC
 jobs:
@@ -23,3 +23,5 @@ jobs:
           git add index.html
           git commit -m "Update virales $(date)" || echo "No changes"
           git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Add token for push
