@@ -22,3 +22,4 @@ jobs:
           git add index.html
           git commit -m "Update virales $(date)" || echo "No changes"
           git push
+
