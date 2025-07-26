@@ -1,5 +1,6 @@
 name: Update Diario
 on:
+  workflow_dispatch:  # Adds manual run button
   schedule:
     - cron: '0 0 * * *'  # 00:00 UTC
 jobs:
