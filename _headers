@@ -1,0 +1,2 @@
+/*
+  Content-Security-Policy: default-src 'self'; img-src 'self' https://*.tiktokcdn.com https://*.tiktokcdn-eu.com https://*.tiktokcdn-us.com https://p16-pu-sign-no.tiktokcdn-eu.com https://p16-sign-useast2a.tiktokcdn.com https://p77-sign-va.tiktokcdn.com https://i.ytimg.com https://placehold.co https://pbs.twimg.com; connect-src 'self' https://*.youtube.com https://*.tiktok.com https://api.twitter.com; style-src 'self' 'unsafe-inline'
