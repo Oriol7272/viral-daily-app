@@ -1,0 +1,24 @@
+name: Update Diario
+on:
+  schedule:
+    - cron: '0 0 * * *'  # 00:00 UTC
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install
+      - run: node generate-virales.js
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          TIKTOK_MS_TOKEN: ${{ secrets.TIKTOK_MS_TOKEN }}
+          X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}
+      - run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add index.html
+          git commit -m "Update virales $(date)" || echo "No changes"
+          git push
